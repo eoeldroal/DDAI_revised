@@ -16,11 +16,16 @@ data:
 actor_rollout_ref:
   hybrid_engine: True
   rollout:
+    agent:
+        default_agent_loop: tool_agent
     name: sglang
     multi_turn:
       enable: True
       max_assistant_turns: 2
       format: qwen
+      tool_config_path: examples/sglang_multiturn/config/tool_config/LNS_tool_config.yaml
+      tool_settings:
+        local_image_root: ./search_engine/corpus/img
 
 retriever:
   url: "http://10.32.2.11:8778/search"

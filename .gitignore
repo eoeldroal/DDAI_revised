@@ -131,3 +131,7 @@ log
 outputs
 .vscode-server/
 .history/
+
+# local history / cache
+.bash_history
+.triton/

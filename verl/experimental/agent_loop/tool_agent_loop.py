@@ -15,7 +15,10 @@ import asyncio
 import json
 import logging
 import os
+import threading
+from datetime import datetime
 from enum import Enum
+from pathlib import Path
 from typing import Any, Optional
 from uuid import uuid4
 
@@ -65,6 +68,7 @@ class AgentData:
         tools_kwargs: dict[str, Any],
         interaction: Optional[BaseInteraction] = None,
         interaction_kwargs: Optional[dict[str, Any]] = None,
+        sample_id: Optional[str] = None,
     ):
         self.messages = messages
         self.image_data = image_data
@@ -74,6 +78,7 @@ class AgentData:
         self.tools_kwargs = tools_kwargs
         self.interaction = interaction
         self.interaction_kwargs = interaction_kwargs or {}
+        self.sample_id = sample_id  # Original dataset id (e.g., "train_14") for search server
 
         # State variables
         self.prompt_ids: list[int] = []
@@ -81,7 +86,6 @@ class AgentData:
         self.response_mask: list[int] = []
         self.response_logprobs: list[float] = []
         self.turn_scores: list[float] = []
-        self.tool_rewards: list[float] = []
         self.user_turns = 0
         self.assistant_turns = 0
 
@@ -112,7 +116,10 @@ class ToolAgentLoop(AgentLoopBase):
         self.max_tool_response_length = config.actor_rollout_ref.rollout.multi_turn.max_tool_response_length
         self.tool_response_truncate_side = config.actor_rollout_ref.rollout.multi_turn.tool_response_truncate_side
         tool_config_path = config.actor_rollout_ref.rollout.multi_turn.tool_config_path
-        tool_list = initialize_tools_from_config(tool_config_path) if tool_config_path else []
+        # Get tool_settings from main config for overriding tool config values
+        tool_settings = getattr(config.actor_rollout_ref.rollout.multi_turn, 'tool_settings', None)
+        extra_config = dict(tool_settings) if tool_settings else {}
+        tool_list = initialize_tools_from_config(tool_config_path, extra_config) if tool_config_path else []
         self.tools = {tool.name: tool for tool in tool_list}
         self.tool_schemas = [tool.tool_schema.model_dump(exclude_unset=True, exclude_none=True) for tool in tool_list]
         self.tool_parser = ToolParser.get_tool_parser(
@@ -132,6 +139,8 @@ class ToolAgentLoop(AgentLoopBase):
 
     @rollout_trace_op
     async def run(self, sampling_params: dict[str, Any], **kwargs) -> AgentLoopOutput:
+        #디버깅 수정
+        print(f"⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️DEBUG: ToolAgentLoop started for request_id: {kwargs.get('request_id', 'unknown')}⭐️⭐️⭐️⭐️⭐️⭐️⭐️", flush=True)
         messages = list(kwargs["raw_prompt"])
 
         # extract images and videos from messages
@@ -142,6 +151,10 @@ class ToolAgentLoop(AgentLoopBase):
         metrics = {}
         request_id = uuid4().hex
         tools_kwargs = kwargs.get("tools_kwargs", {})
+
+        # Extract sample_id from uid (original dataset id like "train_14")
+        sample_id = kwargs.get("uid", None)
+        print(f"🔑 DEBUG [ToolAgentLoop]: sample_id extracted from kwargs['uid'] = {sample_id}", flush=True)
 
         # Initialize interaction if needed
         interaction = None
@@ -168,6 +181,7 @@ class ToolAgentLoop(AgentLoopBase):
             tools_kwargs=tools_kwargs,
             interaction=interaction,
             interaction_kwargs=interaction_kwargs,
+            sample_id=sample_id,
         )
 
         # State machine loop
@@ -205,7 +219,7 @@ class ToolAgentLoop(AgentLoopBase):
             metrics=agent_data.metrics,
             extra_fields={},
         )
-        output.extra_fields.update({"turn_scores": agent_data.turn_scores, "tool_rewards": agent_data.tool_rewards})
+        output.extra_fields.update({"turn_scores": agent_data.turn_scores})
         return output
 
     async def _handle_pending_state(self, agent_data: AgentData, sampling_params: dict[str, Any]) -> AgentState:
@@ -279,6 +293,15 @@ class ToolAgentLoop(AgentLoopBase):
         tasks = []
         tool_call_names = []
         for tool_call in agent_data.tool_calls[: self.max_parallel_calls]:
+
+            # 1. 종료 신호 처리 (generation_phase1.py의 'dones.append(1)' 로직 이식)
+            if tool_call.name == "search_complete":
+                # search_complete가 나오면 즉시 종료 상태로 전이
+                logger.info(f"Terminating sequence due to <search_complete>")
+                return AgentState.TERMINATED
+
+            # 2. 실제 도구(search, bbox) 실행
+            # 이 시점에서 yaml 설정에 'search', 'bbox'라는 이름의 툴이 등록되어 있어야 합니다.
             tasks.append(self._call_tool(tool_call, agent_data.tools_kwargs, agent_data))
             tool_call_names.append(tool_call.name)
 
@@ -287,7 +310,7 @@ class ToolAgentLoop(AgentLoopBase):
 
         # Process tool responses and update multi_modal_data
         # Removed: agent_data.new_images_this_turn = []
-        for tool_response, tool_reward, _ in responses:
+        for tool_response in responses:
             # Create message from tool response
             if tool_response.image or tool_response.video:
                 # Multi-modal content with structured format
@@ -331,9 +354,6 @@ class ToolAgentLoop(AgentLoopBase):
                 raise NotImplementedError(
                     "Multimedia type 'video' is not currently supported. Only 'image' is supported."
                 )
-
-            if tool_reward is not None:
-                agent_data.tool_rewards.append(tool_reward)
 
         agent_data.messages.extend(add_messages)
 
@@ -409,7 +429,7 @@ class ToolAgentLoop(AgentLoopBase):
 
     async def _call_tool(
         self, tool_call: FunctionCall, tools_kwargs: dict[str, Any], agent_data: AgentData
-    ) -> tuple[ToolResponse, float, dict]:
+    ) -> ToolResponse:
         """Call tool and return tool response."""
         tool, instance_id = None, None
         try:
@@ -419,18 +439,12 @@ class ToolAgentLoop(AgentLoopBase):
             tool = self.tools[tool_name]
             kwargs = tools_kwargs.get(tool_name, {})
             instance_id, _ = await tool.create(create_kwargs=kwargs.get("create_kwargs", {}))
-            tool_execution_response, tool_reward, res = await tool.execute(
+            tool_execution_response = await tool.execute(
                 instance_id, tool_args, agent_data=agent_data
             )
         except Exception as e:
             logger.warning(f"Error when executing tool: {e}")
-            return (
-                ToolResponse(
-                    text=f"Error when executing tool: {e}",
-                ),
-                0.0,
-                {},
-            )
+            return ToolResponse(text=f"Error when executing tool: {e}")
         finally:
             if tool and instance_id:
                 await tool.release(instance_id)
@@ -455,7 +469,7 @@ class ToolAgentLoop(AgentLoopBase):
                 if attr_value is not None:
                     tool_response_kwargs[attr_name] = attr_value
 
-        return ToolResponse(**tool_response_kwargs), tool_reward, res
+        return ToolResponse(**tool_response_kwargs)
 
     def _initialize_interactions(self, interaction_config_file):
         """Initialize interactions from configuration.

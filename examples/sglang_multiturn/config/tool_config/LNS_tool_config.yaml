@@ -1,0 +1,44 @@
+# examples/sglang_multiturn/config/tool_config/search_bbox_tool_config.yaml
+
+tools:
+  - name: search
+    # 실제 SearchTool 파이썬 클래스 경로 (아래 4단계에서 구현 필요)
+    class_name: verl.tools.LNS.search_tool.SearchTool 
+    config:
+      type: native
+      retrieval_service_url: http://163.239.28.21:5002/search
+      num_workers: 10
+      timeout: 30
+      local_image_root: ./search_engnie/corpus/img
+    tool_schema:
+      type: function
+      function:
+        name: search
+        description: Search the web for information.
+        parameters:
+          type: object
+          properties:
+            query:  # QwenToolParser가 'query' 키로 넘겨주므로 맞춤
+              type: string
+              description: The search query string.
+          required: [query]
+
+  - name: bbox
+    # 실제 ImageCropper 파이썬 클래스 경로 (아래 4단계에서 구현 필요)
+    class_name: verl.tools.LNS.bbox_tool.ImageCropper
+    config:
+      type: native
+      crops_dir: ./agent_crops
+    tool_schema:
+      type: function
+      function:
+        name: bbox
+        description: Crop the image to focus on a specific region.
+        parameters:
+          type: object
+          properties:
+            bbox:   # QwenToolParser가 'bbox' 키로 넘겨주므로 맞춤
+              type: array
+              items: {type: number}
+              description: "[left, top, right, bottom] coordinates."
+          required: [bbox]

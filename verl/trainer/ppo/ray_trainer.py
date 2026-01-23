@@ -633,9 +633,13 @@ class RayPPOTrainer:
             test_batch = DataProto.from_single_dict(test_data)
 
             if "uid" not in test_batch.non_tensor_batch:
-                test_batch.non_tensor_batch["uid"] = np.array(
-                    [str(uuid.uuid4()) for _ in range(len(test_batch.batch))], dtype=object
-                )
+                # Use original dataset id if exists, otherwise generate UUID
+                if "id" in test_batch.non_tensor_batch:
+                    test_batch.non_tensor_batch["uid"] = test_batch.non_tensor_batch["id"]
+                else:
+                    test_batch.non_tensor_batch["uid"] = np.array(
+                        [str(uuid.uuid4()) for _ in range(len(test_batch.batch))], dtype=object
+                    )
 
             # repeat test batch
             test_batch = test_batch.repeat(
@@ -1426,10 +1430,14 @@ class RayPPOTrainer:
                 batch: DataProto = DataProto.from_single_dict(batch_dict)
                 batch.meta_info["temperature"] = self.config.actor_rollout_ref.rollout.temperature
 
-                # add uid to batch
-                batch.non_tensor_batch["uid"] = np.array(
-                    [str(uuid.uuid4()) for _ in range(len(batch.batch))], dtype=object
-                )
+                # add uid to batch - preserve original id if exists, otherwise generate UUID
+                if "id" in batch.non_tensor_batch:
+                    # Use original dataset id (e.g., "train_14") for search server compatibility
+                    batch.non_tensor_batch["uid"] = batch.non_tensor_batch["id"]
+                else:
+                    batch.non_tensor_batch["uid"] = np.array(
+                        [str(uuid.uuid4()) for _ in range(len(batch.batch))], dtype=object
+                    )
 
                 gen_batch = self._get_gen_batch(batch)
 
