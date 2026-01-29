@@ -21,3 +21,6 @@ actor_rollout_ref:
       enable: True
       max_assistant_turns: 2
       format: qwen
+
+retriever:
+  url: "http://10.32.2.11:8778/search"

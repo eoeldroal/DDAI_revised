@@ -21,3 +21,6 @@ tools:
               description: A list of fully-formed semantic queries. The tool will return search results for each query.
           required: 
             - query_list
+
+retriever:
+  url: "http://10.32.2.11:8778/search"

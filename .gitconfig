@@ -1,0 +1,5 @@
+[user]
+	name = lee-sang-min-korea
+	email = smlee25@inha.edu
+[credential]
+	helper = "!f() { /mnt/isdslab/.vscode-server/bin/94e8ae2b28cb5cc932b86e1070569c4463565c37/node /tmp/vscode-remote-containers-592775b6-3195-42c2-8dd6-7a5aeafc675e.js git-credential-helper $*; }; f"

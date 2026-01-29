@@ -102,6 +102,11 @@ def default_compute_score(
         from . import search_r1_like_qa_em
 
         res = search_r1_like_qa_em.compute_score(solution_str, ground_truth)
+    # ▼▼▼ [여기부터 추가하세요] ▼▼▼
+    elif data_source in ["rag", "slidevqa_test", "mmlongdoc", "vidoseek","slidevqa_train_6667","slidevqa_trai_6667"]:
+        from . import vrag
+        res = vrag.compute_format_reward_only(solution_str, ground_truth, extra_info)
+    # ▲▲▲ [여기까지 추가하세요] ▲▲▲
 
     else:
         raise NotImplementedError(f"Reward function is not implemented for {data_source=}")
