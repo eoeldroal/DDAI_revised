@@ -28,7 +28,7 @@ export UNIFIED_LOG_WRITER_FLUSH_INTERVAL_S=2.0
 export UVLOOP_AUTO=0
 
 n_gpus=4
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=4,5,6,7
 
 # Ray 임시 디렉토리 설정 (AF_UNIX 경로 길이 제한 107바이트 대응)
 mkdir -p /tmp/ray_$USER
@@ -36,14 +36,14 @@ export TMPDIR=/tmp/ray_$USER
 export RAY_TMPDIR=/tmp/ray_$USER
 
 # WandB 설정
-export WANDB_API_KEY='8d955a8fe09693b7a2e983616a79aae912307d79'
-export WANDB_PROJECT='gspo_phase1'
+export WANDB_API_KEY=$WANDB_API_KEY
+export WANDB_PROJECT='gspo_phase1_revised'
 
 export SGL_DISABLE_TP_MEMORY_INBALANCE_CHECK=True
 
 #phsae 설정
-experiment_name='gspo_phase1'
-project_name='gspo_phase1'
+experiment_name='gspo_phase1_revised'
+project_name='gspo_phase1_revised'
 # 모델 경로 (필요 시 환경변수/override로 변경)
 model_path=Qwen/Qwen2.5-VL-7B-Instruct
 
@@ -56,14 +56,21 @@ train_batch_size=16
 ppo_mini_batch_size=4
 ppo_micro_batch_size_per_gpu=1
 log_prob_micro_batch_size_per_gpu=1
-n_agent=1
+n_agent=2
 
 # 기타 설정
 tensor_model_parallel_size=1
-max_turns=2
+max_turns=3
 
 # Retriever 설정
 search_url="http://163.239.28.21:5002/search"
+
+# 이미지 경로 설정 (프로젝트 루트 기준 상대 경로)
+local_image_root="./search_engine/corpus/img"
+
+#Total max response length
+single_turn_max_response_length=2048
+total_max_response_length=$((single_turn_max_response_length * max_turns))
 
 # =============================================================================
 # 3. 로그 디렉토리 생성
@@ -90,7 +97,7 @@ echo "Unified log: $UNIFIED_LOG_PATH"
 echo "=========================================="
 
 
-# =============================================================================
+# ===========================================================================
 ulimit -n 65535
 
 PROJECT_DIR="$(pwd)"
@@ -112,7 +119,7 @@ python3 -m verl.trainer.main_ppo \
     data.train_batch_size=$train_batch_size \
     data.val_batch_size=32 \
     data.max_prompt_length=256 \
-    data.max_response_length=2048 \
+    data.max_response_length=$total_max_response_length \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     data.return_raw_chat=True \
@@ -155,6 +162,8 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.model.trust_remote_code=True \
     actor_rollout_ref.rollout.max_model_len=16384 \
     +actor_rollout_ref.rollout.engine_kwargs.vllm.disable_mm_preprocessor_cache=True \
+    actor_rollout_ref.rollout.agent.default_agent_loop=tool_agent \
     retriever.url=$search_url \
+    actor_rollout_ref.rollout.multi_turn.tool_settings.local_image_root=$local_image_root \
     "$@"
 

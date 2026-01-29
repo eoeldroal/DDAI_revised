@@ -512,6 +512,8 @@ class AgentLoopWorker:
                 dataset_cls=self.dataset_cls,
                 dataset_config=self.config.data,
             )
+            # Pass rollout_n from trajectory to agent loop for GRPO agent tracking
+            kwargs["rollout_n"] = trajectory.get("rollout_n", 0)
             output: AgentLoopOutput = await agent_loop.run(sampling_params, **kwargs)
             return await self._agent_loop_postprocess(output, **kwargs)
 

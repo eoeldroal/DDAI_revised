@@ -21,6 +21,9 @@ from pydantic import BaseModel
 
 from verl.utils.ray_utils import get_event_loop
 from verl.utils.rollout_trace import rollout_trace_op
+#수정 추가
+import re
+from uuid import uuid4
 
 logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
@@ -159,3 +162,57 @@ class GptOssToolParser(ToolParser):
         content = regex.sub(self.tool_call_pattern, "", text)
 
         return content, function_calls
+
+#수정 추가
+@ToolParser.register("qwen")
+class QwenToolParser(ToolParser):
+    def __init__(self, tokenizer):
+        super().__init__(tokenizer)
+        # generation_phase1.py의 로직과 동일한 정규식 패턴 사용
+        self.tool_pattern = re.compile(r"<(search|bbox|search_complete)>(.*?)</\1>", re.DOTALL)
+
+    async def extract_tool_calls(self, response_ids: list[int]) -> tuple[str, list[FunctionCall]]:
+        text = self.tokenizer.decode(response_ids, skip_special_tokens=True)
+        tool_calls = []
+        content_text = text
+
+        matches = list(self.tool_pattern.finditer(text))
+        
+        if matches:
+            # 첫 태그 전까지는 생각(Thought)으로 간주
+            first_match_start = matches[0].start()
+            content_text = text[:first_match_start].strip()
+
+            for match in matches:
+                tag_name = match.group(1)       # search, bbox, search_complete
+                raw_content = match.group(2).strip()
+                
+                arguments = {}
+                try:
+                    if tag_name == 'search':
+                        # generation_phase1.py: 쿼리 스트링 그대로 사용
+                        arguments = {"query": raw_content}
+                        
+                    elif tag_name == 'bbox':
+                        # generation_phase1.py: JSON 리스트 파싱 ([x1, y1, x2, y2])
+                        # 모델이 실수로 json 형식이 아닌 텍스트를 줄 경우를 대비해 try-except
+                        try:
+                            arguments = {"bbox": json.loads(raw_content)}
+                        except json.JSONDecodeError:
+                            # 파싱 실패 시 원본 텍스트라도 넘겨서 Tool 내부에서 에러 처리 유도
+                            arguments = {"bbox_raw": raw_content} 
+                            
+                    elif tag_name == 'search_complete':
+                        # generation_phase1.py: 'true' 여부 확인
+                        arguments = {"status": raw_content}
+                    
+                    # ToolAgentLoop가 인식할 수 있도록 FunctionCall 객체로 포장
+                    tool_calls.append(FunctionCall(
+                        name=tag_name, 
+                        arguments=json.dumps(arguments),
+                    ))
+                except Exception as e:
+                    logger.warning(f"Failed to parse Qwen tool tag {tag_name}: {e}")
+                    continue
+
+        return content_text, tool_calls
