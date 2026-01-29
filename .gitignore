@@ -8,8 +8,6 @@
 **/playground
 **/wandb
 
-**/*.jpg
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -129,5 +127,4 @@ ENV/
 logs
 log
 outputs
-.vscode-server/
-.history/
+.history
