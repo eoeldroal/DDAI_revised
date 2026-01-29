@@ -135,3 +135,23 @@ outputs
 # local history / cache
 .bash_history
 .triton/
+
+
+# --- Personal & Sensitive Files ---
+.bash_history
+.ssh/
+.gnupg/
+.gitconfig
+.cryptography/
+
+# --- System & Cache ---
+.triton/
+__pycache__/
+*.cubin
+*.ptx
+*.llir
+*.ttgir
+*.ttir
+
+# --- Large Data ---
+data/rag/
