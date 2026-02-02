@@ -452,6 +452,23 @@ class RayPPOTrainer:
 
     def _dump_generations(self, inputs, outputs, gts, scores, reward_extra_infos_dict, dump_path):
         """Dump rollout/validation samples as JSONL."""
+        def _json_safe(obj):
+            if isinstance(obj, np.integer):
+                return int(obj)
+            if isinstance(obj, np.floating):
+                return float(obj)
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            if torch.is_tensor(obj):
+                return obj.detach().cpu().tolist()
+            if isinstance(obj, dict):
+                return {k: _json_safe(v) for k, v in obj.items()}
+            if isinstance(obj, (list, tuple)):
+                return [_json_safe(v) for v in obj]
+            return obj
+
+        pretty_log = os.getenv("VERL_PRETTY_ROLLOUT_LOG", "0") == "1"
+
         os.makedirs(dump_path, exist_ok=True)
         filename = os.path.join(dump_path, f"{self.global_steps}.jsonl")
 
@@ -470,11 +487,17 @@ class RayPPOTrainer:
 
         lines = []
         for i in range(n):
-            entry = {k: v[i] for k, v in base_data.items()}
-            lines.append(json.dumps(entry, ensure_ascii=False))
+            entry = {k: _json_safe(v[i]) for k, v in base_data.items()}
+            if pretty_log:
+                lines.append(json.dumps(entry, ensure_ascii=False, indent=2))
+            else:
+                lines.append(json.dumps(entry, ensure_ascii=False))
 
         with open(filename, "w") as f:
-            f.write("\n".join(lines) + "\n")
+            if pretty_log:
+                f.write("\n\n".join(lines) + "\n")
+            else:
+                f.write("\n".join(lines) + "\n")
 
         print(f"Dumped generations to {filename}")
 
@@ -1598,6 +1621,15 @@ class RayPPOTrainer:
 
                         if reward_extra_infos_dict:
                             batch.non_tensor_batch.update({k: np.array(v) for k, v in reward_extra_infos_dict.items()})
+                            # Log reward sub-metrics (e.g., format_score, ndcg) if present
+                            for _key in ("format_score", "ndcg"):
+                                _vals = reward_extra_infos_dict.get(_key, None)
+                                if _vals is not None and len(_vals) > 0:
+                                    try:
+                                        _arr = np.array(_vals, dtype=float)
+                                        metrics[f"reward/{_key}_mean"] = float(_arr.mean())
+                                    except Exception:
+                                        pass
 
                         # compute rewards. apply_kl_penalty if available
                         if self.config.algorithm.use_kl_in_reward:

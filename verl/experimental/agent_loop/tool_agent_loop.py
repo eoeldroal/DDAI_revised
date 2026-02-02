@@ -333,6 +333,8 @@ class ToolAgentLoop(AgentLoopBase):
             metrics=agent_data.metrics,
             extra_fields={},
         )
+        # propagate tool/session extra fields (e.g., image_paths) to reward computation
+        output.extra_fields.update(agent_data.extra_fields)
         output.extra_fields.update({"turn_scores": agent_data.turn_scores})
 
         # Log trajectory at episode termination

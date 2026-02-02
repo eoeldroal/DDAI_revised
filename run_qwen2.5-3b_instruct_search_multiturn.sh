@@ -15,6 +15,7 @@ export PYTHONASYNCIODEBUG=1
 export SEARCH_DEBUG=1
 export SEARCH_DEBUG_LOG_ALL=1
 export SEARCH_DEBUG_MAX_LINES=1000000000
+export VERL_PRETTY_ROLLOUT_LOG=1
 # =============================================================================
 # Unified trajectory logging (single JSONL; append)
 # =============================================================================
@@ -102,6 +103,7 @@ ulimit -n 65535
 
 PROJECT_DIR="$(pwd)"
 CONFIG_PATH="$PROJECT_DIR/examples/sglang_multiturn/config"
+RUN_TS=$(date +%m%d_%H%M)
 
 
 TRAIN_DATA="$HOME/data/rag/slidevqa_train_6667.parquet"
@@ -115,6 +117,8 @@ VAL_DATA="$HOME/data/rag/overall_test_crop.parquet"
 python3 -m verl.trainer.main_ppo \
     --config-path="$CONFIG_PATH" \
     --config-name='search_multiturn_grpo' \
+    custom_reward_function.path="$PROJECT_DIR/verl/utils/reward_score/format_ndcg_reward.py" \
+    custom_reward_function.name=compute_score \
     algorithm.adv_estimator=grpo \
     data.train_batch_size=$train_batch_size \
     data.val_batch_size=32 \
@@ -148,6 +152,8 @@ python3 -m verl.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.val_before_train=False \
     trainer.logger='["console","wandb"]' \
+    trainer.rollout_data_dir=./logs/rollout_data_${RUN_TS} \
+    trainer.validation_data_dir=./logs/val_data_${RUN_TS} \
     trainer.project_name=$project_name \
     trainer.experiment_name=$experiment_name \
     trainer.n_gpus_per_node=$n_gpus \
