@@ -4,29 +4,20 @@ set -x
 # 1. 환경 설정
 # =============================================================================
 # .env 파일 로드 (루트 폴더)
+
+# =============================================================================
+# ASYNC_REWARD=1 -> 커스텀 리워드 함수 계산이 Ray로 비동기 실행
+# ASYNC_REWARD=0 -> 리워드 함수 계산이 동기 실행
+# =============================================================================
+export ASYNC_REWARD=1
+
 if [ -f .env ]; then
     echo ">>> .env 파일 로드 중..."
     export $(grep -v '^#' .env | xargs)
 fi
 
 export PYTHONNOUSERSITE=1
-export PYTHONASYNCIODEBUG=1
-
-export SEARCH_DEBUG=1
-export SEARCH_DEBUG_LOG_ALL=1
-export SEARCH_DEBUG_MAX_LINES=1000000000
 export VERL_PRETTY_ROLLOUT_LOG=1
-# =============================================================================
-# Unified trajectory logging (single JSONL; append)
-# =============================================================================
-export UNIFIED_LOG_ENABLE=1
-export UNIFIED_LOG_PATH=./logs/unified_trajectory.jsonl
-export UNIFIED_LOG_CLIENT_BATCH_SIZE=200
-export UNIFIED_LOG_CLIENT_FLUSH_INTERVAL_S=1.0
-export UNIFIED_LOG_WRITER_FLUSH_EVERY_N=2000
-export UNIFIED_LOG_WRITER_FLUSH_INTERVAL_S=2.0
-
-export UVLOOP_AUTO=0
 
 n_gpus=4
 export CUDA_VISIBLE_DEVICES=4,5,6,7
@@ -96,8 +87,6 @@ echo "Reward: if format pass -> 0.1 + 0.9*NDCG else 0"
 echo "Generation: phase1 (no frozen generator)"
 echo "Unified log: $UNIFIED_LOG_PATH"
 echo "=========================================="
-
-
 # ===========================================================================
 ulimit -n 65535
 
@@ -112,6 +101,14 @@ VAL_DATA="$HOME/data/rag/overall_test_crop.parquet"
 #TOOL_CONFIG="$CONFIG_PATH/tool_config/search_tool_config.yaml"
 #actor_rollout_ref.rollout.multi_turn.tool_config_path="$TOOL_CONFIG" \
 
+
+async_reward_overrides=()
+if [ "${ASYNC_REWARD:-0}" -eq 1 ]; then
+    async_reward_overrides=(
+        reward_model.use_reward_loop=False
+        reward_model.launch_reward_fn_async=True
+    )
+fi
 
 
 python3 -m verl.trainer.main_ppo \
@@ -171,5 +168,5 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.agent.default_agent_loop=tool_agent \
     retriever.url=$search_url \
     actor_rollout_ref.rollout.multi_turn.tool_settings.local_image_root=$local_image_root \
+    "${async_reward_overrides[@]}" \
     "$@"
-
