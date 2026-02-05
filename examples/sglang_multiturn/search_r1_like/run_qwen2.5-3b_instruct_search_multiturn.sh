@@ -19,8 +19,6 @@ TOOL_CONFIG="$CONFIG_PATH/tool_config/search_tool_config.yaml"
 python3 -m verl.trainer.main_ppo \
     --config-path="$CONFIG_PATH" \
     --config-name='search_multiturn_grpo' \
-    custom_reward_function.path="$PROJECT_DIR/verl/utils/reward_score/format_ndcg_reward.py" \
-    custom_reward_function.name=compute_score \
     algorithm.adv_estimator=grpo \
     data.train_batch_size=512 \
     data.val_batch_size=256 \
@@ -55,8 +53,6 @@ python3 -m verl.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.val_before_train=False \
     trainer.logger='["console","wandb"]' \
-    trainer.rollout_data_dir=./logs/rollout_data \
-    trainer.validation_data_dir=./logs/val_data \
     trainer.project_name='search_r1_like_async_rl' \
     trainer.experiment_name='qwen2.5-3b-instruct_function_rm-search-async-sgl-multi-w-searchtool-verify-n16' \
     trainer.n_gpus_per_node=8 \
