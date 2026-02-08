@@ -79,14 +79,19 @@ def get_tool_class(cls_name):
     return tool_cls
 
 
-def initialize_tools_from_config(tools_config_file):
+def initialize_tools_from_config(tools_config_file, extra_config: dict = None):
     """Initialize tools from config file.
 
     Supports both NATIVE and MCP tool types. For MCP tools, a temporary event loop
     is created only when needed and properly closed after use to prevent memory leaks.
+
+    Args:
+        tools_config_file: Path to the tool config YAML file
+        extra_config: Optional dict to merge into each tool's config (for overrides from main config)
     """
     tools_config = OmegaConf.load(tools_config_file)
     tool_list = []
+    extra_config = extra_config or {}
 
     # Lazy initialization for MCP support - only create event loop when needed
     tmp_event_loop = None
@@ -120,8 +125,11 @@ def initialize_tools_from_config(tools_config_file):
                     else:
                         tool_schema_dict = OmegaConf.to_container(tool_config.tool_schema, resolve=True)
                         tool_schema = OpenAIFunctionToolSchema.model_validate(tool_schema_dict)
+                    # Merge extra_config into tool config (extra_config takes priority)
+                    merged_config = OmegaConf.to_container(tool_config.config, resolve=True)
+                    merged_config.update(extra_config)
                     tool = tool_cls(
-                        config=OmegaConf.to_container(tool_config.config, resolve=True),
+                        config=merged_config,
                         tool_schema=tool_schema,
                     )
                     tool_list.append(tool)

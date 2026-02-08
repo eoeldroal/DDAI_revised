@@ -76,7 +76,27 @@ class NaiveRewardManager(AbstractRewardManager):
 
             ground_truth = data_item.non_tensor_batch["reward_model"]["ground_truth"]
             data_source = data_item.non_tensor_batch[self.reward_fn_key]
-            extra_info = data_item.non_tensor_batch.get("extra_info", {})
+            extra_info = dict(data_item.non_tensor_batch.get("extra_info", {}) or {})
+            tool_extra_fields = data_item.non_tensor_batch.get("tool_extra_fields", None)
+            if isinstance(tool_extra_fields, dict):
+                extra_info.update(tool_extra_fields)
+            for key in (
+                "retrievaled_images",
+                "retrieved_images",
+                "retrievaled_image_paths",
+                "retrieved_image_paths",
+                "image_paths",
+                "retrieved_documents",
+                "reference_documents",
+                "reference_page",
+                "reference_pages",
+                "pages",
+                "file_name",
+                "file",
+                "pdf_name",
+            ):
+                if key in data_item.non_tensor_batch and key not in extra_info:
+                    extra_info[key] = data_item.non_tensor_batch[key]
             num_turns = data_item.non_tensor_batch.get("__num_turns__", None)
             rollout_reward_scores = data_item.non_tensor_batch.get("reward_scores", {})
             extra_info["num_turns"] = num_turns
