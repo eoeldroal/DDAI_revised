@@ -114,7 +114,7 @@ fi
 python3 -m verl.trainer.main_ppo \
     --config-path="$CONFIG_PATH" \
     --config-name='search_multiturn_grpo' \
-    custom_reward_function.path="$PROJECT_DIR/verl/utils/reward_score/format_ndcg_reward.py" \
+    custom_reward_function.path="$PROJECT_DIR/verl/utils/reward_score/phase1_reward.py" \
     custom_reward_function.name=compute_score \
     algorithm.adv_estimator=grpo \
     data.train_batch_size=$train_batch_size \

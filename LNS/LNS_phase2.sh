@@ -11,6 +11,8 @@ set -x
 # =============================================================================
 export ASYNC_REWARD=1
 
+pip install google-generativeai --break-system-packages > /dev/null 2>&1
+
 if [ -f .env ]; then
     echo ">>> .env 파일 로드 중..."
     export $(grep -v '^#' .env | xargs)
@@ -18,6 +20,12 @@ fi
 
 export PYTHONNOUSERSITE=1
 export VERL_PRETTY_ROLLOUT_LOG=1
+# =============================================================================
+# 보상함수 가중치
+# =============================================================================
+export JUDGE_WEIGHT="$judge_weight"
+export NDCG_WEIGHT="$ndcg_weight"
+# =============================================================================
 
 n_gpus=4
 export CUDA_VISIBLE_DEVICES=4,5,6,7
@@ -29,13 +37,13 @@ export RAY_TMPDIR=/tmp/ray_$USER
 
 # WandB 설정
 export WANDB_API_KEY=$WANDB_API_KEY
-export WANDB_PROJECT='gspo_phase1_revised'
+export WANDB_PROJECT='gspo_phase2_revised'
 
 export SGL_DISABLE_TP_MEMORY_INBALANCE_CHECK=True
 
 #phsae 설정
-experiment_name='gspo_phase1_revised'
-project_name='gspo_phase1_revised'
+experiment_name='gspo_phase2_revised'
+project_name='gspo_phase2_revised'
 # 모델 경로 (필요 시 환경변수/override로 변경)
 model_path=Qwen/Qwen2.5-VL-7B-Instruct
 
@@ -64,6 +72,12 @@ local_image_root="./search_engine/corpus/img"
 single_turn_max_response_length=2048
 total_max_response_length=$((single_turn_max_response_length * max_turns))
 
+# Frozen Generator 설정 (Phase 2)
+frozen_model="gpt-5-mini-2025-08-07"
+export FROZEN_MODEL_NAME="${FROZEN_MODEL_NAME:-$frozen_model}"
+export FROZEN_API_KEY="${FROZEN_API_KEY:-$OPENAI_API_KEY}"
+export FROZEN_BASE_URL="${FROZEN_BASE_URL:-$OPENAI_BASE_URL}"
+
 # =============================================================================
 # 3. 로그 디렉토리 생성
 # =============================================================================
@@ -78,13 +92,13 @@ export RAY_memory_usage_threshold=0.995
 # 5. 훈련 실행 (Phase 1: gate reward = 0.1*format + 0.9*ndcg)
 # =============================================================================
 echo "=========================================="
-echo "GSPO Phase 1 Training - Format + NDCG (Gate)"
+echo "GSPO Phase 2 Training - Judge + NDCG (No format gate)"
 echo "=========================================="
 echo "모델: $model_path"
 echo "배치 크기: $train_batch_size × $n_agent = $((train_batch_size * n_agent))"
 echo "----------------------------------------"
-echo "Reward: if format pass -> 0.1 + 0.9*NDCG else 0"
-echo "Generation: phase1 (no frozen generator)"
+echo "Reward: ${JUDGE_WEIGHT}*JudgeScore + ${NDCG_WEIGHT}*NDCG (format_score logged only)"
+echo "Generation: phase2 (frozen generator)"
 echo "Unified log: $UNIFIED_LOG_PATH"
 echo "=========================================="
 # ===========================================================================
@@ -98,10 +112,6 @@ RUN_TS=$(date +%m%d_%H%M)
 TRAIN_DATA="$HOME/data/rag/slidevqa_train_6667.parquet"
 VAL_DATA="$HOME/data/rag/overall_test_crop.parquet"
 
-#TOOL_CONFIG="$CONFIG_PATH/tool_config/search_tool_config.yaml"
-#actor_rollout_ref.rollout.multi_turn.tool_config_path="$TOOL_CONFIG" \
-
-
 async_reward_overrides=()
 if [ "${ASYNC_REWARD:-0}" -eq 1 ]; then
     async_reward_overrides=(
@@ -114,7 +124,7 @@ fi
 python3 -m verl.trainer.main_ppo \
     --config-path="$CONFIG_PATH" \
     --config-name='search_multiturn_grpo' \
-    custom_reward_function.path="$PROJECT_DIR/verl/utils/reward_score/format_ndcg_reward.py" \
+    custom_reward_function.path="$PROJECT_DIR/verl/utils/reward_score/phase2_reward.py" \
     custom_reward_function.name=compute_score \
     algorithm.adv_estimator=grpo \
     data.train_batch_size=$train_batch_size \
@@ -143,6 +153,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
     actor_rollout_ref.rollout.n=$n_agent \
     actor_rollout_ref.rollout.multi_turn.max_assistant_turns=$max_turns \
+    actor_rollout_ref.rollout.multi_turn.phase="phase2" \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=$log_prob_micro_batch_size_per_gpu \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     algorithm.use_kl_in_reward=False \

@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import base64
 import json
 import logging
 import os
 import threading
 from datetime import datetime
 from enum import Enum
+from io import BytesIO
 from pathlib import Path
 from typing import Any, Optional
 from uuid import uuid4
@@ -44,6 +46,13 @@ from verl.utils.rollout_trace import rollout_trace_op
 
 logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
+
+try:
+    from openai import AsyncOpenAI
+    _HAS_OPENAI_ASYNC = True
+except Exception:
+    AsyncOpenAI = None
+    _HAS_OPENAI_ASYNC = False
 
 
 class TrajectoryLogger:
@@ -193,7 +202,7 @@ class AgentData:
         self.tool_calls: list[FunctionCall] = []
 
         # Extra fields for dynamic addition, e.g., tool session data
-        self.extra_fields: dict[str, Any] = {}
+        self.extra_fields: dict[str, Any] = {"image_paths": []}
 
 
 @register("tool_agent")
@@ -241,9 +250,153 @@ class ToolAgentLoop(AgentLoopBase):
                 self.interaction_config_file
             )
 
+        self.phase = getattr(config.actor_rollout_ref.rollout.multi_turn, "phase", "phase1")
+        self.frozen_model = os.getenv("FROZEN_MODEL_NAME", "gpt-5-mini-2025-08-07")
+        self.frozen_api_key = os.getenv("FROZEN_API_KEY") or os.getenv("OPENAI_API_KEY")
+        self.frozen_base_url = (
+            os.getenv("FROZEN_BASE_URL")
+            or os.getenv("FROZEN_OPENAI_BASE_URL")
+            or os.getenv("OPENAI_BASE_URL")
+        )
+        self.frozen_max_tokens = int(os.getenv("FROZEN_MAX_TOKENS", "1024"))
+        self.frozen_reasoning_effort = os.getenv("FROZEN_REASONING_EFFORT", "minimal")
+        self.frozen_sys_prompt = (
+            "You are a visual QA generator. "
+            "Use only the provided images and the user question. "
+            "Return ONLY the final answer text without extra explanations. "
+        )
+
     def _set_termination_reason(self, agent_data: AgentData, reason: str) -> None:
         if agent_data.termination_reason is None:
             agent_data.termination_reason = reason
+
+    def _extract_initial_query(self, messages: list[dict[str, Any]]) -> str:
+        for message in messages:
+            if message.get("role") == "user":
+                return self._normalize_user_content(message.get("content"))
+        return ""
+
+    def _normalize_user_content(self, content: Any) -> str:
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts = []
+            for item in content:
+                if isinstance(item, str):
+                    parts.append(item)
+                elif isinstance(item, dict):
+                    text = item.get("text")
+                    if text:
+                        parts.append(str(text))
+            return "\n".join([part for part in parts if part]).strip()
+        return str(content) if content is not None else ""
+
+    def _image_to_base64_url(self, image: Image.Image) -> Optional[str]:
+        try:
+            if image.mode not in ("RGB", "RGBA"):
+                image = image.convert("RGB")
+            buffer = BytesIO()
+            image.save(buffer, format="PNG")
+            encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+            return f"data:image/png;base64,{encoded}"
+        except Exception as e:
+            logger.warning(f"Failed to encode image for frozen generator: {e}")
+            return None
+
+    async def _maybe_close_openai_client(self, client: object) -> None:
+        try:
+            close_fn = getattr(client, "close", None)
+            if close_fn is None:
+                return
+            result = close_fn()
+            if asyncio.iscoroutine(result):
+                await result
+        except Exception:
+            return
+
+    async def _call_frozen_generator(self, question: str, images: list[Image.Image]) -> str:
+        if not _HAS_OPENAI_ASYNC:
+            logger.warning("OpenAI Async SDK not available; skipping frozen generator call.")
+            return ""
+        if not self.frozen_api_key:
+            logger.warning("FROZEN_API_KEY/OPENAI_API_KEY not set; skipping frozen generator call.")
+            return ""
+
+        client_kwargs: dict[str, Any] = {
+            "api_key": self.frozen_api_key,
+            "timeout": 60.0,
+            "max_retries": 0,
+        }
+        if self.frozen_base_url:
+            client_kwargs["base_url"] = self.frozen_base_url
+
+        client = AsyncOpenAI(**client_kwargs)
+        try:
+            qtext = (question or "").strip() or "."
+            user_content = []
+
+            if images:
+                for img in images:
+                    if img is None:
+                        continue
+                    base64_url = self._image_to_base64_url(img)
+                    if base64_url:
+                        user_content.append({"type": "input_image", "image_url": base64_url})
+
+            user_content.append({"type": "input_text", "text": f"Question: {qtext}"})
+            input_items = [{"role": "user", "content": user_content}]
+
+            response = await client.responses.create(
+                model=self.frozen_model,
+                instructions=self.frozen_sys_prompt,
+                input=input_items,
+                reasoning={"effort": self.frozen_reasoning_effort},
+                max_output_tokens=self.frozen_max_tokens,
+                store=False,
+            )
+
+            answer = getattr(response, "output_text", None)
+            if not answer and getattr(response, "output", None):
+                parts = []
+                for item in response.output:
+                    if getattr(item, "type", "") in ("message", "output_text"):
+                        if hasattr(item, "content"):
+                            for content in getattr(item, "content", []):
+                                if content.get("type") == "output_text":
+                                    parts.append(content.get("text", ""))
+                        elif hasattr(item, "text"):
+                            parts.append(getattr(item, "text", ""))
+                answer = "\n".join([part for part in parts if part])
+            return (answer or "").strip()
+        except Exception as e:
+            logger.warning(f"Frozen generator call failed: {e}")
+            return ""
+        finally:
+            await self._maybe_close_openai_client(client)
+
+    async def _encode_messages_without_generation(self, messages: list[dict[str, Any]]) -> list[int]:
+        if self.processor is not None:
+            raw_prompt = await self.loop.run_in_executor(
+                None,
+                lambda: self.processor.apply_chat_template(
+                    messages,
+                    add_generation_prompt=False,
+                    tokenize=False,
+                    **self.apply_chat_template_kwargs,
+                ),
+            )
+            return await self.loop.run_in_executor(
+                None, lambda: self.tokenizer.encode(raw_prompt, add_special_tokens=False)
+            )
+        return await self.loop.run_in_executor(
+            None,
+            lambda: self.tokenizer.apply_chat_template(
+                messages,
+                add_generation_prompt=False,
+                tokenize=True,
+                **self.apply_chat_template_kwargs,
+            ),
+        )
 
     @rollout_trace_op
     async def run(self, sampling_params: dict[str, Any], **kwargs) -> AgentLoopOutput:
@@ -454,7 +607,29 @@ class ToolAgentLoop(AgentLoopBase):
             if tool_call.name == "search_complete":
                 # search_complete가 나오면 즉시 종료 상태로 전이
                 logger.info(f"Terminating sequence due to <search_complete>")
-                self._set_termination_reason(agent_data, "search_complete")
+                if self.phase == "phase2":
+                    question = self._extract_initial_query(agent_data.messages)
+                    images = agent_data.image_data or []
+                    if not isinstance(images, list):
+                        images = [images]
+                    answer_text = await self._call_frozen_generator(question, images)
+                    answer_message = {"role": "assistant", "content": f"<answer>{answer_text}</answer>"}
+                    agent_data.messages.append(answer_message)
+
+                    response_ids = await self._encode_messages_without_generation([answer_message])
+                    if len(agent_data.response_mask) + len(response_ids) >= self.response_length:
+                        self._set_termination_reason(agent_data, "response_length")
+                        return AgentState.TERMINATED
+
+                    agent_data.prompt_ids += response_ids
+                    # Frozen generator output should not contribute to actor loss.
+                    agent_data.response_mask += [0] * len(response_ids)
+                    if agent_data.response_logprobs:
+                        agent_data.response_logprobs += [0.0] * len(response_ids)
+                    agent_data.assistant_turns += 1
+                    self._set_termination_reason(agent_data, "search_complete_w_answer")
+                else:
+                    self._set_termination_reason(agent_data, "search_complete")
                 return AgentState.TERMINATED
 
             # 2. 실제 도구(search, bbox) 실행

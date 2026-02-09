@@ -1,0 +1,7 @@
+FROM verlai/verl:sgl056.latest
+
+RUN pip install --no-cache-dir \
+    "transformers==4.57.3" \
+    "transformer_engine==2.10.0+769ed77" \
+    cachetools \
+    google-generativeai

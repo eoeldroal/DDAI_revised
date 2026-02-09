@@ -59,6 +59,7 @@ class MultiTurnConfig(BaseConfig):
     format: str = "hermes"
     num_repeat_rollouts: Optional[int] = None
     tool_settings: Optional[dict] = None
+    phase: str = "phase1"
 
 
 @dataclass

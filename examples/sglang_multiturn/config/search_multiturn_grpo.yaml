@@ -23,6 +23,7 @@ actor_rollout_ref:
       enable: True
       max_assistant_turns: 2
       format: qwen
+      phase: phase1
       tool_config_path: examples/sglang_multiturn/config/tool_config/LNS_tool_config.yaml
       tool_settings:
         local_image_root: ./search_engine/corpus/img

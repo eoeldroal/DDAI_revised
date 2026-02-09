@@ -20,6 +20,7 @@
 *.tar.gz
 wget-log
 output.txt
+/wheels/
 # === 3. Python & Environment ===
 __pycache__/
 *.py[cod]

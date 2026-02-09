@@ -1621,8 +1621,15 @@ class RayPPOTrainer:
 
                         if reward_extra_infos_dict:
                             batch.non_tensor_batch.update({k: np.array(v) for k, v in reward_extra_infos_dict.items()})
-                            # Log reward sub-metrics (e.g., format_score, ndcg) if present
-                            for _key in ("format_score", "ndcg"):
+                            # Log reward sub-metrics (e.g., score/judge_score/format_score/ndcg) if present
+                            for _key in (
+                                "score",
+                                "judge_score",
+                                "format_score",
+                                "ndcg",
+                                "judge_weight",
+                                "ndcg_weight",
+                            ):
                                 _vals = reward_extra_infos_dict.get(_key, None)
                                 if _vals is not None and len(_vals) > 0:
                                     try:
