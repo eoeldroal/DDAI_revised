@@ -1,0 +1,38 @@
+hydra:
+  searchpath:
+    - file://verl/trainer/config
+
+defaults:
+  - ppo_trainer
+  - _self_
+
+data:
+  max_prompt_length: 256
+  max_response_length: 16384
+  train_batch_size: 64
+  val_batch_size: 32
+  return_raw_chat: True #  Dataset → [{"role": "user", "content": "질문..."}, ...]  (채팅 메시지 리스트) → AgentLoop이 이걸 받아서 apply_chat_template()을 직접 호출
+  shuffle: False
+  filter_overlong_prompts: True
+  truncation: 'error'
+  image_key: 'images'
+
+actor_rollout_ref:
+  model:
+    trust_remote_code: True
+    use_remove_padding: True
+  hybrid_engine: True
+  rollout:
+    agent:
+      default_agent_loop: tool_agent
+    name: sglang
+    multi_turn:
+      enable: True
+      max_assistant_turns: 5
+      format: qwen
+      tool_config_path: LNS/LNS_tool_config.yaml
+    max_model_len: 32768
+    trace:
+      backend: weave
+      token2text: true
+      max_samples_per_step_per_worker: 1

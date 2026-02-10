@@ -59,6 +59,14 @@ dist/
 # === 6. Project Specific Trash ===
 **/playground/
 .dotnet/
+
+# === 6b. Local Large Assets / Notes (Keep Out Of Git) ===
+tmp/
+*.whl
+.claude/
+*.code-workspace
+# Local LNS corpus images are large and machine-specific; keep configs/docs under LNS/ tracked.
+LNS/corpus/
 # === 7. User Specific & Security (Recommended) ===
 .local/             # 사용자 로컬 라이브러리 및 바이너리 (매우 중요)
 .gitconfig          # 개인 Git 설정 파일
@@ -72,3 +80,5 @@ dist/
 .nv/                # NVIDIA 캐시 폴더
 .triton/            # Triton 컴파일 캐시 (기존에 있었으나 재확인)
 .ssh/
+# local dataset artifacts (keep repository code clean)
+data/**
