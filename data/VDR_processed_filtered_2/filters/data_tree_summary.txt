@@ -1,0 +1,76 @@
+Data Directory Structure Summary
+Repo: HyunBin/DDAI_Revised/verl
+
+Notes
+- This is a depth-limited summary. The full data/ tree contains a very large number of files.
+- By default, most of data/** is ignored by .gitignore to keep the repo lightweight.
+- We track data/VDR_processed_filtered_2/filters/** for reproducibility, except files >100MB.
+
+Top-Level Under data/
+- data/VDR/
+- data/VDR_processed/
+- data/VDR_processed_filtered_1/
+- data/VDR_processed_filtered_2/
+- data/embeddings/
+- data/gsm8k/
+- data/rag/
+
+Depth-Limited Tree (max depth=2)
+data/  (files: 0, dirs: 7, local_size: 0 B)
+  data/gsm8k/  (files: 2, dirs: 0, local_size: 5.18 MB)
+  data/VDR_processed/  (files: 2, dirs: 3, local_size: 10.69 KB)
+    data/VDR_processed/corpus_index/  (files: 3, dirs: 0, local_size: 27.11 MB)
+    data/VDR_processed/qa/  (files: 0, dirs: 3, local_size: 0 B)
+    data/VDR_processed/corpus/  (files: 0, dirs: 3, local_size: 0 B)
+  data/embeddings/  (files: 0, dirs: 3, local_size: 0 B)
+    data/embeddings/siglip_embeddings/  (files: 0, dirs: 3, local_size: 0 B)
+    data/embeddings/query_embeddings/  (files: 8, dirs: 0, local_size: 1.60 GB)
+    data/embeddings/siglip_embeddings_filtered/  (files: 0, dirs: 1, local_size: 0 B)
+  data/rag/  (files: 3, dirs: 0, local_size: 1.94 MB)
+  data/VDR_processed_filtered_2/  (files: 1, dirs: 7, local_size: 10.51 KB)
+    data/VDR_processed_filtered_2/Deck_processing/  (files: 3, dirs: 8, local_size: 51.78 KB)
+    data/VDR_processed_filtered_2/corpus_index/  (files: 3, dirs: 0, local_size: 18.93 MB)
+    data/VDR_processed_filtered_2/embeddings/  (files: 0, dirs: 1, local_size: 0 B)
+    data/VDR_processed_filtered_2/filters/  (files: 2, dirs: 4, local_size: 1.09 KB)
+    data/VDR_processed_filtered_2/qa_doc_independent_filtered/  (files: 0, dirs: 3, local_size: 0 B)
+    data/VDR_processed_filtered_2/corpus/  (files: 0, dirs: 3, local_size: 0 B)
+    data/VDR_processed_filtered_2/qa_gti_filtered_2plus/  (files: 2, dirs: 3, local_size: 2.41 KB)
+  data/VDR_processed_filtered_1/  (files: 1, dirs: 6, local_size: 13.06 KB)
+    data/VDR_processed_filtered_1/corpus_index/  (files: 3, dirs: 0, local_size: 18.93 MB)
+    data/VDR_processed_filtered_1/qa_filtered_RLVR/  (files: 0, dirs: 4, local_size: 0 B)
+    data/VDR_processed_filtered_1/qa/  (files: 0, dirs: 3, local_size: 0 B)
+    data/VDR_processed_filtered_1/filters/  (files: 0, dirs: 2, local_size: 0 B)
+    data/VDR_processed_filtered_1/corpus/  (files: 0, dirs: 3, local_size: 0 B)
+    data/VDR_processed_filtered_1/qa_query_dedup/  (files: 0, dirs: 3, local_size: 0 B)
+  data/VDR/  (files: 2, dirs: 4, local_size: 507.97 KB)
+    data/VDR/OpenDocVQA-Corpus/  (files: 3, dirs: 6, local_size: 26.18 KB)
+    data/VDR/VDR_ibm-research_REAL-MM-RAG/  (files: 44, dirs: 0, local_size: 26.05 GB)
+    data/VDR/SlideVQA/  (files: 3, dirs: 1, local_size: 22.27 KB)
+    data/VDR/OpenDocVQA/  (files: 5, dirs: 5, local_size: 285.31 KB)
+
+Tracked Filter Artifacts: data/VDR_processed_filtered_2/filters/
+- data/VDR_processed_filtered_2/filters/doc_independent_filter_stats.json	1.09 KB
+- data/VDR_processed_filtered_2/filters/doc_independent_qwen235b_logs/OpenDocVQA_20260122_073506.jsonl	72.61 MB
+- data/VDR_processed_filtered_2/filters/doc_independent_qwen235b_logs/SlideVQA_test_20260122_073506.jsonl	3.99 MB
+- data/VDR_processed_filtered_2/filters/doc_independent_qwen235b_logs/SlideVQA_train_20260122_073506.jsonl	19.35 MB
+- data/VDR_processed_filtered_2/filters/doc_independent_qwen235b_logs/SlideVQA_val_20260122_073506.jsonl	2.90 MB
+- data/VDR_processed_filtered_2/filters/gti_validation/OpenDocVQA.jsonl	84.34 MB
+- data/VDR_processed_filtered_2/filters/gti_validation/SlideVQA_train.jsonl	20.79 MB
+- data/VDR_processed_filtered_2/filters/query_rewrites/OpenDocVQA_20260125_135340.jsonl	21.05 MB
+- data/VDR_processed_filtered_2/filters/query_rewrites/SlideVQA_test_20260125_135340.jsonl	1.06 MB
+- data/VDR_processed_filtered_2/filters/query_rewrites/SlideVQA_train_20260125_135340.jsonl	5.53 MB
+- data/VDR_processed_filtered_2/filters/query_rewrites/SlideVQA_val_20260125_135340.jsonl	888.76 KB
+- data/VDR_processed_filtered_2/filters/query_rewrites/VDR_ibm_20260125_135340.jsonl	36.12 MB
+- data/VDR_processed_filtered_2/filters/removed_ids/OpenDocVQA.csv	26.57 KB
+- data/VDR_processed_filtered_2/filters/removed_ids/SlideVQA_test.csv	4.80 KB
+- data/VDR_processed_filtered_2/filters/removed_ids/SlideVQA_train.csv	12.11 KB
+- data/VDR_processed_filtered_2/filters/removed_ids/SlideVQA_val.csv	1.46 KB
+- data/VDR_processed_filtered_2/filters/removed_ids/VDR_ibm.csv	1.32 KB
+- data/VDR_processed_filtered_2/filters/removed_ids/gti_missing_in_corpusindex_OpenDocVQA.csv	1.53 KB
+- data/VDR_processed_filtered_2/filters/removed_ids/gti_missing_runs_OpenDocVQA.csv	53 B
+- data/VDR_processed_filtered_2/filters/removed_ids/gti_missing_runs_SlideVQA_train.csv	864 B
+- data/VDR_processed_filtered_2/filters/removed_ids/gti_missing_runs_VDR_ibm.csv	661 B
+
+Not Tracked (Excluded)
+- data/VDR_processed_filtered_2/filters/gti_validation/VDR_ibm.jsonl	130.46 MB (>100MB GitHub hard limit)
+- data/VDR_processed_filtered_2/filters/doc_independent_qwen235b_logs/VDR_ibm_20260122_073506.jsonl	118.40 MB (>100MB GitHub hard limit)
