@@ -82,3 +82,16 @@ LNS/corpus/
 .ssh/
 # local dataset artifacts (keep repository code clean)
 data/**
+
+# --- Exceptions: keep lightweight filter artifacts tracked ---
+# We intentionally keep most of `data/` out of git, but the filtering outputs
+# (stats, removed id lists, rewrite logs) are useful for reproducibility.
+!data/
+!data/VDR_processed_filtered_2/
+!data/VDR_processed_filtered_2/filters/
+!data/VDR_processed_filtered_2/filters/**
+!data/VDR_processed_filtered_2/filters/**/*.jsonl
+
+# GitHub hard limit: files > 100MB cannot be pushed.
+data/VDR_processed_filtered_2/filters/gti_validation/VDR_ibm.jsonl
+data/VDR_processed_filtered_2/filters/doc_independent_qwen235b_logs/VDR_ibm_20260122_073506.jsonl
