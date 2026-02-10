@@ -1,0 +1,51 @@
+{
+  "yes_threshold": 2,
+  "min_runs": 4,
+  "require_full_runs": true,
+  "datasets": {
+    "OpenDocVQA": {
+      "total": 32802,
+      "removed": 1143,
+      "kept": 31659,
+      "results_files": [
+        "OpenDocVQA_20260122_071248.jsonl",
+        "OpenDocVQA_20260122_071336.jsonl",
+        "OpenDocVQA_20260122_072724.jsonl",
+        "OpenDocVQA_20260122_073506.jsonl",
+        "OpenDocVQA_20260123_071729.jsonl"
+      ]
+    },
+    "VDR_ibm": {
+      "total": 58755,
+      "removed": 26,
+      "kept": 58729,
+      "results_files": [
+        "VDR_ibm_20260122_073506.jsonl"
+      ]
+    },
+    "SlideVQA_train": {
+      "total": 10346,
+      "removed": 693,
+      "kept": 9653,
+      "results_files": [
+        "SlideVQA_train_20260122_073506.jsonl"
+      ]
+    },
+    "SlideVQA_val": {
+      "total": 1544,
+      "removed": 84,
+      "kept": 1460,
+      "results_files": [
+        "SlideVQA_val_20260122_073506.jsonl"
+      ]
+    },
+    "SlideVQA_test": {
+      "total": 2067,
+      "removed": 281,
+      "kept": 1786,
+      "results_files": [
+        "SlideVQA_test_20260122_073506.jsonl"
+      ]
+    }
+  }
+}
